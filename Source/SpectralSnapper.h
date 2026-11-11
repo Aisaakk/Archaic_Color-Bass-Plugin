@@ -14,7 +14,7 @@ public:
     static constexpr int numViz = 96, maxN = 4096, osamp = 4;
     static constexpr float loHz = 100.f, hiHz = 6000.f;
 
-    struct Params { float color = 100.f; int key = 0; int scale = 0; };
+    struct Params { float color = 100.f; std::array<bool, 12> mask {}; };   // mask = notas permitidas (pitch classes absolutos)
 
     std::array<std::atomic<float>, numViz> vizDry, vizTuned;   // 0..1, lo lee la interfaz
 
@@ -104,9 +104,7 @@ private:
         fft->performRealOnlyForwardTransform (d, true);
 
         // pitch classes dentro de la escala y desplazamiento al mas cercano
-        bool inScale[12] = {};
-        const auto& sc = getScales()[(size_t) juce::jlimit (0, (int) getScales().size() - 1, p.scale)];
-        for (int n : sc.iv) inScale[(p.key + n) % 12] = true;
+        const auto& inScale = p.mask;
         int snap[12];
         for (int pc = 0; pc < 12; ++pc)
         {

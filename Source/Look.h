@@ -5,14 +5,15 @@
 struct Theme
 {
     bool dark;
-    juce::Colour bgTop, bgBottom, text, sub, purple, cyan, glassA, glassB;
+    juce::Colour bgTop, bgBottom, text, sub, pink, amber, glassA, glassB, violet;
 };
 
 inline Theme makeTheme (bool dark)
 {
     using C = juce::Colour;
-    if (dark) return { true, C (0xff090612), C (0xff150b2b), C (0xfff2ecff), C (0xff9b8fc0), C (0xff9b5cff), C (0xff35d7ff), C (0x24ffffff), C (0x08ffffff) };
-    return { false, C (0xfff7f3ff), C (0xffe3d9fb), C (0xff2b1a52), C (0xff7d6fa8), C (0xff8a46ff), C (0xff0fb4ee), C (0xd9ffffff), C (0x73ffffff) };
+    //                 oscuro: carbon calido            claro: crema/durazno
+    if (dark) return { true,  C (0xff141112), C (0xff22161a), C (0xfffff1ee), C (0xffb59ca3), C (0xffff4f8f), C (0xffffa63d), C (0x24ffffff), C (0x08ffffff), C (0xff8a5bff) };
+    return            { false, C (0xfffff7f3), C (0xffffe3d8), C (0xff3a1f2b), C (0xff9a7480), C (0xffec2f78), C (0xfff58a12), C (0xd9ffffff), C (0x73ffffff), C (0xff7a45f0) };
 }
 
 inline juce::Font uiFont (float h, bool bold = false)
@@ -33,7 +34,7 @@ namespace glass
 
         if (glowAmt > 0.f)       DropShadow (glow.withAlpha (glowAmt), (int) (r.getHeight() * 0.4f), { 0, 0 }).drawForPath (g, p);
         else if (t.dark)         DropShadow (Colours::black.withAlpha (0.5f), 12, { 0, 4 }).drawForPath (g, p);
-        else                     DropShadow (t.purple.withAlpha (0.16f), 14, { 0, 5 }).drawForPath (g, p);
+        else                     DropShadow (t.pink.withAlpha (0.16f), 14, { 0, 5 }).drawForPath (g, p);
 
         g.setGradientFill (ColourGradient (t.glassA, r.getX(), r.getY(), t.glassB, r.getX(), r.getBottom(), false));
         g.fillPath (p);
@@ -65,7 +66,7 @@ public:
         th = makeTheme (d);
         setColour (juce::PopupMenu::backgroundColourId, d ? juce::Colour (0xff1b0f33) : juce::Colour (0xfffaf7ff));
         setColour (juce::PopupMenu::textColourId, th.text);
-        setColour (juce::PopupMenu::highlightedBackgroundColourId, th.purple.withAlpha (0.55f));
+        setColour (juce::PopupMenu::highlightedBackgroundColourId, th.pink.withAlpha (0.55f));
         setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
         setColour (juce::ComboBox::textColourId, th.text);
     }
@@ -101,19 +102,19 @@ public:
         if (s.getComponentID() == "color")   // 0-100 morado (mezcla), 100-200 celeste (cola resonante)
         {
             const float mid = (a0 + a1) * 0.5f;
-            arc (a0, jmin (ang, mid), th.purple);
-            arc (mid, ang, th.cyan);
+            arc (a0, jmin (ang, mid), th.pink);
+            arc (mid, ang, th.amber);
         }
-        else arc (a0, ang, th.purple.interpolatedWith (th.cyan, pos * 0.8f));
+        else arc (a0, ang, th.pink.interpolatedWith (th.amber, pos * 0.8f));
 
         const Point<float> tip (c.x + std::sin (ang) * R * 0.62f, c.y - std::cos (ang) * R * 0.62f);
-        g.setColour (th.cyan.withAlpha (0.35f));
+        g.setColour (th.amber.withAlpha (0.35f));
         g.fillEllipse (Rectangle<float> (R * 0.2f, R * 0.2f).withCentre (tip));
-        g.setColour (th.dark ? Colours::white : th.purple.darker (0.3f));
+        g.setColour (th.dark ? Colours::white : th.pink.darker (0.3f));
         g.fillEllipse (Rectangle<float> (R * 0.1f, R * 0.1f).withCentre (tip));
 
         g.setColour (th.text);
-        g.setFont (uiFont (R * 0.24f, true));
+        g.setFont (uiFont (R * (s.getComponentID() == "color" ? 0.24f : 0.27f), true));
         g.drawText (s.getTextFromValue (s.getValue()), Rectangle<float> (R * 1.0f, R * 0.4f).withCentre (c), Justification::centred);
     }
 
@@ -122,7 +123,7 @@ public:
     {
         auto r = b.getLocalBounds().toFloat().reduced (2.f);
         const bool on = b.getToggleState();
-        glass::panel (g, r, r.getHeight() * 0.32f, th, on ? th.purple : juce::Colour(), on ? 0.55f : 0.f, on ? th.purple : juce::Colour());
+        glass::panel (g, r, r.getHeight() * 0.32f, th, on ? th.pink : juce::Colour(), on ? 0.55f : 0.f, on ? th.pink : juce::Colour());
         if (hover && ! on) { g.setColour (juce::Colours::white.withAlpha (0.07f)); g.fillRoundedRectangle (r, r.getHeight() * 0.32f); }
         if (down) { g.setColour (juce::Colours::black.withAlpha (0.12f)); g.fillRoundedRectangle (r, r.getHeight() * 0.32f); }
     }
@@ -147,8 +148,8 @@ public:
             const float pad = r.getHeight() * 0.11f, dia = r.getHeight() - pad * 2.f;
             auto ball = Rectangle<float> (dia, dia).withY (r.getY() + pad).withX (on ? r.getRight() - pad - dia : r.getX() + pad);
             Path bp; bp.addEllipse (ball);
-            DropShadow (th.purple.withAlpha (0.8f), (int) dia, { 0, 0 }).drawForPath (g, bp);
-            g.setGradientFill (ColourGradient (th.purple.brighter (0.5f), ball.getX(), ball.getY(), th.purple.darker (0.2f), ball.getX(), ball.getBottom(), false));
+            DropShadow (th.pink.withAlpha (0.8f), (int) dia, { 0, 0 }).drawForPath (g, bp);
+            g.setGradientFill (ColourGradient (th.pink.brighter (0.5f), ball.getX(), ball.getY(), th.pink.darker (0.2f), ball.getX(), ball.getBottom(), false));
             g.fillEllipse (ball);
             g.setColour (Colours::white.withAlpha (0.55f));
             g.drawEllipse (ball.reduced (0.7f), 1.2f);
@@ -157,7 +158,7 @@ public:
             if (on)   // luna
             {
                 g.fillEllipse (Rectangle<float> (u * 0.9f, u * 0.9f).withCentre (c));
-                g.setColour (th.purple.interpolatedWith (th.purple.darker (0.2f), 0.5f));
+                g.setColour (th.pink.interpolatedWith (th.pink.darker (0.2f), 0.5f));
                 g.fillEllipse (Rectangle<float> (u * 0.8f, u * 0.8f).withCentre (c.translated (u * 0.28f, -u * 0.2f)));
             }
             else      // sol
@@ -175,8 +176,8 @@ public:
             const bool active = ! on;
             const float s = jmin (r.getWidth(), r.getHeight());
             auto sq = Rectangle<float> (s, s).withCentre (r.getCentre());
-            glass::panel (g, sq, s * 0.5f, th, th.cyan, active ? 0.35f : 0.f);
-            const auto col = active ? th.cyan : th.sub.withAlpha (0.7f);
+            glass::panel (g, sq, s * 0.5f, th, th.amber, active ? 0.35f : 0.f);
+            const auto col = active ? th.amber : th.sub.withAlpha (0.7f);
             const float rad = s * 0.22f; const auto c = sq.getCentre();
             Path p;
             p.addCentredArc (c.x, c.y, rad, rad, 0.f, 0.6f, MathConstants<float>::twoPi - 0.6f, true);
@@ -186,13 +187,20 @@ public:
             g.setColour (col);
             g.strokePath (p, PathStrokeType (rad * 0.24f, PathStrokeType::curved, PathStrokeType::rounded));
         }
+        else if (id == "midi")
+        {
+            glass::panel (g, r, r.getHeight() * 0.5f, th, th.pink, on ? 0.5f : 0.f, on ? th.pink : juce::Colour());
+            g.setColour (on ? Colours::white : th.sub);
+            g.setFont (uiFont (r.getHeight() * 0.42f, true));
+            g.drawText ("MIDI", r, Justification::centred);
+        }
         else   // calidad: FAST | QUALITY
         {
             glass::panel (g, r, r.getHeight() * 0.5f, th);
             auto half = r.withWidth (r.getWidth() * 0.5f);
             auto sel = on ? half.withX (r.getCentreX()) : half;
-            glass::panel (g, sel.reduced (2.f), sel.getHeight() * 0.5f, th, th.purple, 0.5f, th.purple);
-            g.setFont (uiFont (r.getHeight() * 0.36f, true));
+            glass::panel (g, sel.reduced (2.f), sel.getHeight() * 0.5f, th, th.pink, 0.5f, th.pink);
+            g.setFont (uiFont (r.getHeight() * 0.30f, true));
             g.setColour (on ? th.sub : Colours::white);   g.drawText ("FAST", half, Justification::centred);
             g.setColour (on ? Colours::white : th.sub);   g.drawText ("QUALITY", half.withX (r.getCentreX()), Justification::centred);
         }
@@ -207,7 +215,7 @@ public:
         juce::Path p;
         const float cx = r.getRight() - r.getHeight() * 0.55f, cy = r.getCentreY(), s = r.getHeight() * 0.13f;
         p.addTriangle (cx - s, cy - s * 0.6f, cx + s, cy - s * 0.6f, cx, cy + s * 0.8f);
-        g.setColour (th.cyan);
+        g.setColour (th.amber);
         g.fillPath (p);
     }
     juce::Font getComboBoxFont (juce::ComboBox& c) override { return uiFont ((float) c.getHeight() * 0.4f); }
@@ -220,3 +228,37 @@ public:
 private:
     Theme th = makeTheme (true);
 };
+
+// ---------------------------------------------------------------- Logotipo cromado
+// Letras con relleno de metal liquido azul (degradado con reflejo), brillo y destello.
+inline void drawWordmark (juce::Graphics& g, juce::Rectangle<float> area, const juce::Typeface::Ptr& tf, bool dark)
+{
+    using namespace juce;
+    GlyphArrangement ga;
+    ga.addLineOfText (Font (FontOptions (tf).withHeight (100.f)), "Archaic", 0.f, 0.f);
+    Path p;
+    ga.createPath (p);
+    const auto b = p.getBounds();
+    if (b.isEmpty()) return;
+    const float s = jmin (area.getWidth() / b.getWidth(), area.getHeight() / b.getHeight());
+    p.applyTransform (AffineTransform::translation (-b.getX(), -b.getY()).scaled (s).translated (area.getX(), area.getY() + (area.getHeight() - b.getHeight() * s) * 0.5f));
+    const auto pb = p.getBounds();
+
+    DropShadow (Colour (0xff3b5bff).withAlpha (dark ? 0.85f : 0.55f), (int) (pb.getHeight() * 0.55f), { 0, 0 }).drawForPath (g, p);
+
+    ColourGradient chrome (Colour (0xfff2f8ff), 0.f, pb.getY(), Colour (0xffe9f3ff), 0.f, pb.getBottom(), false);
+    chrome.addColour (0.22, Colour (0xffa9c8ff));
+    chrome.addColour (0.46, Colour (0xff2b4fe0));
+    chrome.addColour (0.56, Colour (0xff1a2fa8));
+    chrome.addColour (0.63, Colour (0xffcfe6ff));    // linea de reflejo
+    chrome.addColour (0.80, Colour (0xff6e8dff));
+    g.setGradientFill (chrome);
+    g.fillPath (p);
+    g.setColour (Colours::white.withAlpha (0.7f));
+    g.strokePath (p, PathStrokeType (jmax (0.8f, pb.getHeight() * 0.012f)));
+
+    Path star;   // destello
+    star.addStar ({ pb.getRight() - pb.getWidth() * 0.06f, pb.getY() + pb.getHeight() * 0.1f }, 4, pb.getHeight() * 0.03f, pb.getHeight() * 0.28f, 0.f);
+    g.setColour (Colours::white.withAlpha (0.9f));
+    g.fillPath (star);
+}

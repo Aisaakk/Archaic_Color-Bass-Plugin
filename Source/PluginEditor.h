@@ -2,7 +2,7 @@
 #include "PluginProcessor.h"
 #include "Look.h"
 
-// Espectro 100 Hz - 6 kHz: morado = señal original, celeste = frecuencias movidas
+// Espectro 100 Hz - 6 kHz: violeta = señal original, ambar = frecuencias movidas
 class Visualizer : public juce::Component, private juce::Timer
 {
 public:
@@ -31,18 +31,21 @@ public:
 private:
     void applyTheme (bool dark);
     void updateKeys (float v);
+    static juce::File sizeFile();
 
     ArchaicProcessor& proc;
     ArchaicLNF lnf;
+    juce::Typeface::Ptr wordFont;
     Visualizer viz;
-    juce::Slider color, gain;
-    juce::ComboBox scale;
+    juce::Slider color, decay, spacing, drift, shift, resMix, gain;
+    juce::ComboBox scale, chord, octave;
     juce::TextButton keys[12];
-    juce::ToggleButton themeBtn, bypassBtn, qualityBtn;
+    juce::ToggleButton themeBtn, bypassBtn, qualityBtn, midiBtn;
     juce::ParameterAttachment keyAttach, themeAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> colorAtt, gainAtt;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> scaleAtt;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAtt, qualityAtt;
+    using APVTS = juce::AudioProcessorValueTreeState;
+    std::vector<std::unique_ptr<APVTS::SliderAttachment>> sliderAtts;
+    std::vector<std::unique_ptr<APVTS::ComboBoxAttachment>> comboAtts;
+    std::vector<std::unique_ptr<APVTS::ButtonAttachment>> buttonAtts;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ArchaicEditor)
 };

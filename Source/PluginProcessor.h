@@ -1,6 +1,8 @@
 #pragma once
 #include "Parameters.h"
 #include "SpectralSnapper.h"
+#include "Resonator.h"
+#include <bitset>
 
 class ArchaicProcessor : public juce::AudioProcessor
 {
@@ -15,7 +17,7 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
     const juce::String getName() const override { return "Archaic"; }
-    bool acceptsMidi() const override { return false; }
+    bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 1.5; }
     int getNumPrograms() override { return 1; }
@@ -30,10 +32,13 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
     SpectralSnapper snapper;
+    ResonatorBank resonator;
 
 private:
     void applyQuality (int q);
     std::atomic<float> *pColor, *pKey, *pScale, *pQuality, *pGain;
+    std::atomic<float> *pMidi, *pChord, *pOctave, *pDecay, *pSpacing, *pDrift, *pShift, *pResMix;
+    std::bitset<128> held, latched;   // notas MIDI sostenidas / ultimo acorde
     int currentQuality = -1;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ArchaicProcessor)
 };
