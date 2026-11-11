@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.22)
+project(Archaic VERSION 0.1.0)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(FetchContent)
+FetchContent_Declare(JUCE
+  GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+  GIT_TAG 8.0.6
+  GIT_SHALLOW ON)
+FetchContent_MakeAvailable(JUCE)
+
+# En GitHub Actions (variable CI) no se copia el plugin a carpetas del sistema
+if(DEFINED ENV{CI})
+  set(ARCHAIC_COPY FALSE)
+else()
+  set(ARCHAIC_COPY TRUE)
+endif()
+
+juce_add_plugin(Archaic
+  COMPANY_NAME "Aisaak"
+  PLUGIN_MANUFACTURER_CODE Aisk
+  PLUGIN_CODE Arch
+  FORMATS VST3
+  PRODUCT_NAME "Archaic"
+  VST3_CATEGORIES Fx
+  IS_SYNTH FALSE
+  NEEDS_MIDI_INPUT FALSE
+  NEEDS_MIDI_OUTPUT FALSE
+  COPY_PLUGIN_AFTER_BUILD ${ARCHAIC_COPY})
+
+target_sources(Archaic PRIVATE
+  Source/PluginProcessor.cpp
+  Source/PluginEditor.cpp)
+
+target_compile_definitions(Archaic PUBLIC
+  JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
+
+# Para usar tus propios assets (SVG/PNG): mételos en Assets/ y descomenta
+# juce_add_binary_data(ArchaicAssets SOURCES Assets/boton.svg)
+# target_link_libraries(Archaic PRIVATE ArchaicAssets)
+
+target_link_libraries(Archaic
+  PRIVATE juce::juce_audio_utils juce::juce_dsp
+  PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags)
