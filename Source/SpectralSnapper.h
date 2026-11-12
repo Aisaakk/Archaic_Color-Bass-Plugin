@@ -43,10 +43,12 @@ public:
         for (auto& c : ch) c.reset (N - N / osamp);
     }
 
+    void reset() { setSize (N); }
+
     int getLatency() const { return N - N / osamp; }
 
     // procesa in-place: salida = dry retrasado*(1-mix) + wet*mix*gain
-    void process (int c, float* x, int num, const Params& p, float mix, float gain)
+    void process (int c, float* x, int num, const Params& p, float mix, float gain, float* dryTap = nullptr)
     {
         auto& s = ch[(size_t) c];
         const int hop = N / osamp, lat = N - hop;
@@ -56,6 +58,7 @@ public:
             s.dryBuf[(size_t) s.dryPos] = in;
             const float dry = s.dryBuf[(size_t) ((s.dryPos - lat + maxN) % maxN)];
             s.dryPos = (s.dryPos + 1) % maxN;
+            if (dryTap) dryTap[i] = dry;
 
             s.inFifo[(size_t) s.rover] = in;
             const float wet = s.outFifo[(size_t) (s.rover - lat)];

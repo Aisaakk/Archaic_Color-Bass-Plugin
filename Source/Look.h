@@ -2,18 +2,20 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 // ---------------------------------------------------------------- Tema
+// Interfaz limpia (estilo claro, perillas oscuras). El modo oscuro es la alternativa.
 struct Theme
 {
     bool dark;
-    juce::Colour bgTop, bgBottom, text, sub, pink, amber, glassA, glassB, violet;
+    juce::Colour bg, panelTop, panelBot, text, sub, knobTop, knob, track, well, pink, amber, violet, shadow, light;
 };
 
 inline Theme makeTheme (bool dark)
 {
     using C = juce::Colour;
-    //                 oscuro: carbon calido            claro: crema/durazno
-    if (dark) return { true,  C (0xff141112), C (0xff22161a), C (0xfffff1ee), C (0xffb59ca3), C (0xffff4f8f), C (0xffffa63d), C (0x24ffffff), C (0x08ffffff), C (0xff8a5bff) };
-    return            { false, C (0xfffff7f3), C (0xffffe3d8), C (0xff3a1f2b), C (0xff9a7480), C (0xffec2f78), C (0xfff58a12), C (0xd9ffffff), C (0x73ffffff), C (0xff7a45f0) };
+    if (dark) return { true,  C (0xff131315), C (0xff2b2b30), C (0xff232327), C (0xfff0f0f2), C (0xff9c9ca6), C (0xff2a2a2f), C (0xff0e0e10),
+                              C (0xff3b3b42), C (0xff070709), C (0xffff5c98), C (0xffffa84a), C (0xff9d78ff), C (0x80000000), C (0x0cffffff) };
+    return            { false, C (0xffe3e3e6), C (0xfff7f7f8), C (0xffebebee), C (0xff222226), C (0xff777780), C (0xff303036), C (0xff17171b),
+                              C (0xffcdcdd3), C (0xff0b0b0e), C (0xffe8387f), C (0xfff0902a), C (0xff8b5cf6), C (0x30000000), C (0xf2ffffff) };
 }
 
 inline juce::Font uiFont (float h, bool bold = false)
@@ -21,37 +23,48 @@ inline juce::Font uiFont (float h, bool bold = false)
     return juce::Font (juce::FontOptions (h, bold ? juce::Font::bold : juce::Font::plain));
 }
 
-// ------------------------------------------------- Pieza base "liquid glass"
-// Todo el aspecto de cristal sale de esta funcion: cambia aqui y cambia en todo el plugin.
-namespace glass
+// ------------------------------------------------- Piezas base (todo el aspecto sale de aqui)
+namespace ui
 {
-    inline void panel (juce::Graphics& g, juce::Rectangle<float> r, float corner, const Theme& t,
-                       juce::Colour glow = {}, float glowAmt = 0.f, juce::Colour tint = {})
+    // panel elevado con sombra suave (solo se dibuja en el fondo guardado en cache)
+    inline void panel (juce::Graphics& g, juce::Rectangle<float> r, float corner, const Theme& t)
     {
         using namespace juce;
         Path p;
         p.addRoundedRectangle (r, corner);
-
-        if (glowAmt > 0.f)       DropShadow (glow.withAlpha (glowAmt), (int) (r.getHeight() * 0.4f), { 0, 0 }).drawForPath (g, p);
-        else if (t.dark)         DropShadow (Colours::black.withAlpha (0.5f), 12, { 0, 4 }).drawForPath (g, p);
-        else                     DropShadow (t.pink.withAlpha (0.16f), 14, { 0, 5 }).drawForPath (g, p);
-
-        g.setGradientFill (ColourGradient (t.glassA, r.getX(), r.getY(), t.glassB, r.getX(), r.getBottom(), false));
+        DropShadow (t.shadow, 16, { 5, 7 }).drawForPath (g, p);
+        DropShadow (t.light, 12, { -4, -4 }).drawForPath (g, p);
+        g.setGradientFill (ColourGradient (t.panelTop, r.getX(), r.getY(), t.panelBot, r.getX(), r.getBottom(), false));
         g.fillPath (p);
+        g.setColour (t.dark ? Colours::white.withAlpha (0.06f) : Colours::white.withAlpha (0.9f));
+        g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.f);
+    }
 
-        if (! tint.isTransparent())
+    // boton plano ligeramente elevado (barato de dibujar)
+    inline void button (juce::Graphics& g, juce::Rectangle<float> r, float corner, const Theme& t, bool on)
+    {
+        using namespace juce;
+        if (on)
         {
-            g.setGradientFill (ColourGradient (tint.withAlpha (0.78f), r.getX(), r.getY(), tint.withAlpha (0.30f), r.getX(), r.getBottom(), false));
-            g.fillPath (p);
+            g.setGradientFill (ColourGradient (t.knobTop, r.getX(), r.getY(), t.knob, r.getX(), r.getBottom(), false));
+            g.fillRoundedRectangle (r, corner);
+            return;
         }
+        g.setColour (t.shadow.withMultipliedAlpha (0.8f));
+        g.fillRoundedRectangle (r.translated (0.f, 1.5f), corner);
+        g.setGradientFill (ColourGradient (t.dark ? t.panelTop.brighter (0.15f) : Colours::white, r.getX(), r.getY(), t.panelBot, r.getX(), r.getBottom(), false));
+        g.fillRoundedRectangle (r, corner);
+        g.setColour (t.track.withAlpha (t.dark ? 0.8f : 0.6f));
+        g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.f);
+    }
 
-        g.setGradientFill (ColourGradient (Colours::white.withAlpha (t.dark ? 0.15f : 0.55f), r.getX(), r.getY(),
-                                           Colours::transparentWhite, r.getX(), r.getY() + r.getHeight() * 0.5f, false));
-        g.fillRoundedRectangle (r.withHeight (r.getHeight() * 0.5f), corner);
-
-        g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.6f), r.getX(), r.getY(),
-                                           Colours::white.withAlpha (0.08f), r.getX(), r.getBottom(), false));
-        g.drawRoundedRectangle (r.reduced (0.7f), corner, 1.3f);
+    // pantalla oscura empotrada
+    inline void well (juce::Graphics& g, juce::Rectangle<float> r, float corner, const Theme& t)
+    {
+        g.setColour (t.well);
+        g.fillRoundedRectangle (r, corner);
+        g.setColour (juce::Colours::white.withAlpha (0.07f));
+        g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.f);
     }
 }
 
@@ -59,33 +72,33 @@ namespace glass
 class ArchaicLNF : public juce::LookAndFeel_V4
 {
 public:
-    ArchaicLNF() { setDark (true); }
+    float glow = 0.f;   // 0 = sin brillo; sube solo cuando entra sonido al plugin
+
+    ArchaicLNF() { setDark (false); }
 
     void setDark (bool d)
     {
         th = makeTheme (d);
-        setColour (juce::PopupMenu::backgroundColourId, d ? juce::Colour (0xff1b0f33) : juce::Colour (0xfffaf7ff));
+        setColour (juce::PopupMenu::backgroundColourId, d ? juce::Colour (0xff1d1d21) : juce::Colour (0xfff7f7f8));
         setColour (juce::PopupMenu::textColourId, th.text);
-        setColour (juce::PopupMenu::highlightedBackgroundColourId, th.pink.withAlpha (0.55f));
+        setColour (juce::PopupMenu::highlightedBackgroundColourId, th.knob);
         setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
         setColour (juce::ComboBox::textColourId, th.text);
     }
     const Theme& theme() const { return th; }
 
-    // ---- Knobs
+    // ---- Perillas: disco oscuro + anillo de color
     void drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos, float a0, float a1, juce::Slider& s) override
     {
         using namespace juce;
         const float d = (float) jmin (w, h);
-        auto r = Rectangle<float> (d, d).withCentre (Rectangle<float> ((float) x, (float) y, (float) w, (float) h).getCentre()).reduced (d * 0.04f);
+        auto r = Rectangle<float> (d, d).withCentre (Rectangle<float> ((float) x, (float) y, (float) w, (float) h).getCentre());
         const auto c = r.getCentre();
-        const float R = r.getWidth() * 0.5f, ringR = R * 0.9f, ringW = R * 0.09f;
-
-        glass::panel (g, r.reduced (R * 0.22f), R, th);
+        const float R = r.getWidth() * 0.5f, ringR = R * 0.9f, ringW = jmax (2.f, R * 0.075f), discR = R * 0.7f;
 
         Path track;
         track.addCentredArc (c.x, c.y, ringR, ringR, 0.f, a0, a1, true);
-        g.setColour (th.text.withAlpha (0.14f));
+        g.setColour (th.track);
         g.strokePath (track, PathStrokeType (ringW, PathStrokeType::curved, PathStrokeType::rounded));
 
         const float ang = a0 + pos * (a1 - a0);
@@ -94,12 +107,15 @@ public:
             if (to - from < 0.001f) return;
             Path p;
             p.addCentredArc (c.x, c.y, ringR, ringR, 0.f, from, to, true);
-            g.setColour (col.withAlpha (th.dark ? 0.30f : 0.22f));
-            g.strokePath (p, PathStrokeType (ringW * 2.6f, PathStrokeType::curved, PathStrokeType::rounded));
+            if (glow > 0.02f)
+            {
+                g.setColour (col.withAlpha (0.35f * glow));
+                g.strokePath (p, PathStrokeType (ringW * 2.8f, PathStrokeType::curved, PathStrokeType::rounded));
+            }
             g.setColour (col);
             g.strokePath (p, PathStrokeType (ringW, PathStrokeType::curved, PathStrokeType::rounded));
         };
-        if (s.getComponentID() == "color")   // 0-100 morado (mezcla), 100-200 celeste (cola resonante)
+        if (s.getComponentID() == "color")   // 0-100 mezcla (rosa), 100-200 cola resonante (naranja)
         {
             const float mid = (a0 + a1) * 0.5f;
             arc (a0, jmin (ang, mid), th.pink);
@@ -107,34 +123,47 @@ public:
         }
         else arc (a0, ang, th.pink.interpolatedWith (th.amber, pos * 0.8f));
 
-        const Point<float> tip (c.x + std::sin (ang) * R * 0.62f, c.y - std::cos (ang) * R * 0.62f);
-        g.setColour (th.amber.withAlpha (0.35f));
-        g.fillEllipse (Rectangle<float> (R * 0.2f, R * 0.2f).withCentre (tip));
-        g.setColour (th.dark ? Colours::white : th.pink.darker (0.3f));
-        g.fillEllipse (Rectangle<float> (R * 0.1f, R * 0.1f).withCentre (tip));
+        g.setColour (Colours::black.withAlpha (th.dark ? 0.5f : 0.18f));
+        g.fillEllipse (Rectangle<float> (discR * 2.f, discR * 2.f).withCentre (c.translated (0.f, R * 0.04f)));
+        g.setGradientFill (ColourGradient (th.knobTop, c.x, c.y - discR, th.knob, c.x, c.y + discR, false));
+        g.fillEllipse (Rectangle<float> (discR * 2.f, discR * 2.f).withCentre (c));
+        g.setColour (Colours::white.withAlpha (0.08f));
+        g.drawEllipse (Rectangle<float> (discR * 2.f, discR * 2.f).withCentre (c).reduced (0.5f), 1.f);
 
-        g.setColour (th.text);
-        g.setFont (uiFont (R * (s.getComponentID() == "color" ? 0.24f : 0.27f), true));
-        g.drawText (s.getTextFromValue (s.getValue()), Rectangle<float> (R * 1.0f, R * 0.4f).withCentre (c), Justification::centred);
+        const Point<float> tip (c.x + std::sin (ang) * discR * 0.78f, c.y - std::cos (ang) * discR * 0.78f);
+        g.setColour (Colours::white.withAlpha (0.92f));
+        g.fillEllipse (Rectangle<float> (discR * 0.14f, discR * 0.14f).withCentre (tip));
+
+        g.setColour (Colours::white.withAlpha (0.92f));
+        g.setFont (uiFont (discR * (s.getComponentID() == "color" ? 0.34f : 0.4f), true));
+        g.drawText (s.getTextFromValue (s.getValue()), Rectangle<float> (discR * 1.7f, discR * 0.7f).withCentre (c.translated (0.f, discR * 0.12f)), Justification::centred);
     }
 
-    // ---- Botones de texto (teclas de la tonalidad)
+    // ---- Teclas de la tonalidad
     void drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool hover, bool down) override
     {
-        auto r = b.getLocalBounds().toFloat().reduced (2.f);
-        const bool on = b.getToggleState();
-        glass::panel (g, r, r.getHeight() * 0.32f, th, on ? th.pink : juce::Colour(), on ? 0.55f : 0.f, on ? th.pink : juce::Colour());
-        if (hover && ! on) { g.setColour (juce::Colours::white.withAlpha (0.07f)); g.fillRoundedRectangle (r, r.getHeight() * 0.32f); }
-        if (down) { g.setColour (juce::Colours::black.withAlpha (0.12f)); g.fillRoundedRectangle (r, r.getHeight() * 0.32f); }
+        auto r = b.getLocalBounds().toFloat().reduced (3.f);
+        ui::button (g, r, juce::jmin (8.f, r.getHeight() * 0.3f), th, b.getToggleState());
+        if (hover && ! b.getToggleState()) { g.setColour (th.pink.withAlpha (0.08f)); g.fillRoundedRectangle (r, 8.f); }
+        if (down) { g.setColour (juce::Colours::black.withAlpha (0.08f)); g.fillRoundedRectangle (r, 8.f); }
     }
     void drawButtonText (juce::Graphics& g, juce::TextButton& b, bool, bool) override
     {
-        g.setColour (b.getToggleState() ? juce::Colours::white : th.text);
-        g.setFont (uiFont ((float) b.getHeight() * 0.38f, b.getToggleState()));
+        const bool on = b.getToggleState();
+        g.setColour (on ? juce::Colours::white : th.text);
+        g.setFont (uiFont ((float) b.getHeight() * 0.36f, on));
         g.drawText (b.getButtonText(), b.getLocalBounds(), juce::Justification::centred);
+        if (on)   // punto de color (brilla solo con sonido)
+        {
+            const float dd = (float) b.getHeight() * 0.1f;
+            auto dot = juce::Rectangle<float> (dd, dd).withCentre ({ (float) b.getWidth() * 0.5f, (float) b.getHeight() * 0.82f });
+            if (glow > 0.02f) { g.setColour (th.pink.withAlpha (0.4f * glow)); g.fillEllipse (dot.expanded (dd * 0.8f)); }
+            g.setColour (th.pink);
+            g.fillEllipse (dot);
+        }
     }
 
-    // ---- Interruptores: tema, bypass, calidad
+    // ---- Interruptores: tema, bypass, MIDI, calidad
     void drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool hover, bool) override
     {
         using namespace juce;
@@ -142,123 +171,93 @@ public:
         const bool on = b.getToggleState();
         const auto id = b.getComponentID();
 
-        if (id == "theme")   // interruptor claro/oscuro: esfera a la derecha = oscuro
+        if (id == "theme")   // esfera a la derecha = oscuro
         {
-            glass::panel (g, r, r.getHeight() * 0.5f, th);
-            const float pad = r.getHeight() * 0.11f, dia = r.getHeight() - pad * 2.f;
+            g.setColour (th.track);
+            g.fillRoundedRectangle (r, r.getHeight() * 0.5f);
+            const float pad = r.getHeight() * 0.1f, dia = r.getHeight() - pad * 2.f;
             auto ball = Rectangle<float> (dia, dia).withY (r.getY() + pad).withX (on ? r.getRight() - pad - dia : r.getX() + pad);
-            Path bp; bp.addEllipse (ball);
-            DropShadow (th.pink.withAlpha (0.8f), (int) dia, { 0, 0 }).drawForPath (g, bp);
-            g.setGradientFill (ColourGradient (th.pink.brighter (0.5f), ball.getX(), ball.getY(), th.pink.darker (0.2f), ball.getX(), ball.getBottom(), false));
+            g.setGradientFill (ColourGradient (th.knobTop, ball.getX(), ball.getY(), th.knob, ball.getX(), ball.getBottom(), false));
             g.fillEllipse (ball);
-            g.setColour (Colours::white.withAlpha (0.55f));
-            g.drawEllipse (ball.reduced (0.7f), 1.2f);
             auto c = ball.getCentre(); const float u = dia * 0.5f;
             g.setColour (Colours::white);
-            if (on)   // luna
+            if (on)
             {
                 g.fillEllipse (Rectangle<float> (u * 0.9f, u * 0.9f).withCentre (c));
-                g.setColour (th.pink.interpolatedWith (th.pink.darker (0.2f), 0.5f));
+                g.setColour (th.knobTop);
                 g.fillEllipse (Rectangle<float> (u * 0.8f, u * 0.8f).withCentre (c.translated (u * 0.28f, -u * 0.2f)));
             }
-            else      // sol
+            else
             {
                 g.fillEllipse (Rectangle<float> (u * 0.55f, u * 0.55f).withCentre (c));
                 for (int i = 0; i < 8; ++i)
                 {
                     const float a = (float) i * MathConstants<float>::pi / 4.f;
-                    g.drawLine (c.x + std::cos (a) * u * 0.42f, c.y + std::sin (a) * u * 0.42f, c.x + std::cos (a) * u * 0.62f, c.y + std::sin (a) * u * 0.62f, 1.6f);
+                    g.drawLine (c.x + std::cos (a) * u * 0.42f, c.y + std::sin (a) * u * 0.42f, c.x + std::cos (a) * u * 0.62f, c.y + std::sin (a) * u * 0.62f, 1.5f);
                 }
             }
         }
-        else if (id == "bypass")   // encendido = procesando; apagado (gris) = bypass
+        else if (id == "bypass")   // encendido (color) = procesando; gris = bypass
         {
             const bool active = ! on;
             const float s = jmin (r.getWidth(), r.getHeight());
             auto sq = Rectangle<float> (s, s).withCentre (r.getCentre());
-            glass::panel (g, sq, s * 0.5f, th, th.amber, active ? 0.35f : 0.f);
-            const auto col = active ? th.amber : th.sub.withAlpha (0.7f);
+            ui::button (g, sq, s * 0.5f, th, false);
+            const auto col = active ? th.pink : th.sub.withAlpha (0.8f);
             const float rad = s * 0.22f; const auto c = sq.getCentre();
             Path p;
             p.addCentredArc (c.x, c.y, rad, rad, 0.f, 0.6f, MathConstants<float>::twoPi - 0.6f, true);
             p.startNewSubPath (c.x, c.y - rad * 1.15f);
             p.lineTo (c.x, c.y - rad * 0.1f);
-            if (active) { g.setColour (col.withAlpha (0.3f)); g.strokePath (p, PathStrokeType (rad * 0.6f, PathStrokeType::curved, PathStrokeType::rounded)); }
+            if (active && glow > 0.02f) { g.setColour (col.withAlpha (0.35f * glow)); g.strokePath (p, PathStrokeType (rad * 0.7f, PathStrokeType::curved, PathStrokeType::rounded)); }
             g.setColour (col);
             g.strokePath (p, PathStrokeType (rad * 0.24f, PathStrokeType::curved, PathStrokeType::rounded));
         }
         else if (id == "midi")
         {
-            glass::panel (g, r, r.getHeight() * 0.5f, th, th.pink, on ? 0.5f : 0.f, on ? th.pink : juce::Colour());
+            const bool held = (bool) b.getProperties()["held"];
+            ui::button (g, r, r.getHeight() * 0.5f, th, on);
             g.setColour (on ? Colours::white : th.sub);
-            g.setFont (uiFont (r.getHeight() * 0.42f, true));
-            g.drawText ("MIDI", r, Justification::centred);
+            g.setFont (uiFont (r.getHeight() * 0.4f, true));
+            g.drawText ("MIDI", r.withTrimmedLeft (r.getHeight() * 0.3f), Justification::centred);
+            auto dot = Rectangle<float> (r.getHeight() * 0.22f, r.getHeight() * 0.22f).withCentre ({ r.getX() + r.getHeight() * 0.42f, r.getCentreY() });
+            const auto col = (on && held) ? th.pink : th.sub.withAlpha (0.6f);
+            if (on && held && glow > 0.02f) { g.setColour (col.withAlpha (0.4f * glow)); g.fillEllipse (dot.expanded (r.getHeight() * 0.1f)); }
+            g.setColour (col);
+            g.fillEllipse (dot);
         }
         else   // calidad: FAST | QUALITY
         {
-            glass::panel (g, r, r.getHeight() * 0.5f, th);
+            g.setColour (th.track);
+            g.fillRoundedRectangle (r, r.getHeight() * 0.5f);
             auto half = r.withWidth (r.getWidth() * 0.5f);
             auto sel = on ? half.withX (r.getCentreX()) : half;
-            glass::panel (g, sel.reduced (2.f), sel.getHeight() * 0.5f, th, th.pink, 0.5f, th.pink);
-            g.setFont (uiFont (r.getHeight() * 0.30f, true));
+            ui::button (g, sel.reduced (2.f), sel.getHeight() * 0.5f, th, true);
+            g.setFont (uiFont (r.getHeight() * 0.3f, true));
             g.setColour (on ? th.sub : Colours::white);   g.drawText ("FAST", half, Justification::centred);
             g.setColour (on ? Colours::white : th.sub);   g.drawText ("QUALITY", half.withX (r.getCentreX()), Justification::centred);
         }
-        if (hover) { g.setColour (Colours::white.withAlpha (0.04f)); g.fillRoundedRectangle (r, r.getHeight() * 0.5f); }
+        if (hover) { g.setColour (Colours::black.withAlpha (0.03f)); g.fillRoundedRectangle (r, r.getHeight() * 0.5f); }
     }
 
-    // ---- Combo (escala)
+    // ---- Combos
     void drawComboBox (juce::Graphics& g, int w, int h, bool, int, int, int, int, juce::ComboBox&) override
     {
-        auto r = juce::Rectangle<float> (0.f, 0.f, (float) w, (float) h).reduced (2.f);
-        glass::panel (g, r, r.getHeight() * 0.32f, th);
+        auto r = juce::Rectangle<float> (0.f, 0.f, (float) w, (float) h).reduced (3.f);
+        ui::button (g, r, juce::jmin (8.f, r.getHeight() * 0.3f), th, false);
         juce::Path p;
-        const float cx = r.getRight() - r.getHeight() * 0.55f, cy = r.getCentreY(), s = r.getHeight() * 0.13f;
+        const float cx = r.getRight() - r.getHeight() * 0.5f, cy = r.getCentreY(), s = r.getHeight() * 0.12f;
         p.addTriangle (cx - s, cy - s * 0.6f, cx + s, cy - s * 0.6f, cx, cy + s * 0.8f);
-        g.setColour (th.amber);
+        g.setColour (th.sub);
         g.fillPath (p);
     }
-    juce::Font getComboBoxFont (juce::ComboBox& c) override { return uiFont ((float) c.getHeight() * 0.4f); }
+    juce::Font getComboBoxFont (juce::ComboBox& c) override { return uiFont ((float) c.getHeight() * (c.getWidth() < c.getHeight() * 3 ? 0.31f : 0.38f)); }
     void positionComboBoxText (juce::ComboBox& c, juce::Label& l) override
     {
-        l.setBounds (c.getHeight() / 3, 1, c.getWidth() - c.getHeight() * 2, c.getHeight() - 2);
+        l.setBounds (c.getHeight() / 3, 1, c.getWidth() - c.getHeight() / 3 - (int) (c.getHeight() * 0.8f), c.getHeight() - 2);
         l.setFont (getComboBoxFont (c));
     }
 
 private:
-    Theme th = makeTheme (true);
+    Theme th = makeTheme (false);
 };
-
-// ---------------------------------------------------------------- Logotipo cromado
-// Letras con relleno de metal liquido azul (degradado con reflejo), brillo y destello.
-inline void drawWordmark (juce::Graphics& g, juce::Rectangle<float> area, const juce::Typeface::Ptr& tf, bool dark)
-{
-    using namespace juce;
-    GlyphArrangement ga;
-    ga.addLineOfText (Font (FontOptions (tf).withHeight (100.f)), "Archaic", 0.f, 0.f);
-    Path p;
-    ga.createPath (p);
-    const auto b = p.getBounds();
-    if (b.isEmpty()) return;
-    const float s = jmin (area.getWidth() / b.getWidth(), area.getHeight() / b.getHeight());
-    p.applyTransform (AffineTransform::translation (-b.getX(), -b.getY()).scaled (s).translated (area.getX(), area.getY() + (area.getHeight() - b.getHeight() * s) * 0.5f));
-    const auto pb = p.getBounds();
-
-    DropShadow (Colour (0xff3b5bff).withAlpha (dark ? 0.85f : 0.55f), (int) (pb.getHeight() * 0.55f), { 0, 0 }).drawForPath (g, p);
-
-    ColourGradient chrome (Colour (0xfff2f8ff), 0.f, pb.getY(), Colour (0xffe9f3ff), 0.f, pb.getBottom(), false);
-    chrome.addColour (0.22, Colour (0xffa9c8ff));
-    chrome.addColour (0.46, Colour (0xff2b4fe0));
-    chrome.addColour (0.56, Colour (0xff1a2fa8));
-    chrome.addColour (0.63, Colour (0xffcfe6ff));    // linea de reflejo
-    chrome.addColour (0.80, Colour (0xff6e8dff));
-    g.setGradientFill (chrome);
-    g.fillPath (p);
-    g.setColour (Colours::white.withAlpha (0.7f));
-    g.strokePath (p, PathStrokeType (jmax (0.8f, pb.getHeight() * 0.012f)));
-
-    Path star;   // destello
-    star.addStar ({ pb.getRight() - pb.getWidth() * 0.06f, pb.getY() + pb.getHeight() * 0.1f }, 4, pb.getHeight() * 0.03f, pb.getHeight() * 0.28f, 0.f);
-    g.setColour (Colours::white.withAlpha (0.9f));
-    g.fillPath (star);
-}

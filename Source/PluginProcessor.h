@@ -1,8 +1,11 @@
 #pragma once
+#include <bitset>
+#include <juce_dsp/juce_dsp.h>
 #include "Parameters.h"
 #include "SpectralSnapper.h"
 #include "Resonator.h"
-#include <bitset>
+#include "Liquid.h"
+#include "BandLimiter.h"
 
 class ArchaicProcessor : public juce::AudioProcessor
 {
@@ -25,7 +28,6 @@ public:
     void setCurrentProgram (int) override {}
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
-    juce::AudioProcessorParameter* getBypassParameter() const override { return apvts.getParameter (ID::bypass); }
 
     void getStateInformation (juce::MemoryBlock&) override;
     void setStateInformation (const void*, int) override;
@@ -33,12 +35,34 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     SpectralSnapper snapper;
     ResonatorBank resonator;
+    Liquid liquid;
+    std::atomic<float> inLevel { 0.f };      // nivel de entrada (para que la interfaz brille solo con sonido)
+    std::atomic<bool> midiHeld { false };    // hay notas MIDI sostenidas
 
 private:
+    struct Ring   // retardo para alinear con la latencia del ajuste espectral
+    {
+        std::array<float, 8192> b {};
+        int pos = 0;
+        float tick (float x, int d) { b[(size_t) pos] = x; const float y = b[(size_t) ((pos - d) & 8191)]; pos = (pos + 1) & 8191; return y; }
+        void clear() { b.fill (0.f); pos = 0; }
+    };
+
     void applyQuality (int q);
-    std::atomic<float> *pColor, *pKey, *pScale, *pQuality, *pGain;
+    void handleMidi (const juce::MidiBuffer&);
+
+    std::atomic<float> *pColor, *pKey, *pScale, *pQuality, *pGain, *pBypass;
     std::atomic<float> *pMidi, *pChord, *pOctave, *pDecay, *pSpacing, *pDrift, *pShift, *pResMix;
-    std::bitset<128> held, latched;   // notas MIDI sostenidas / ultimo acorde
+    std::atomic<float> *pWave, *pLiquid, *pFlow, *pSplitLo, *pSplitHi;
+
+    std::array<Ring, 2> dryRing;
+    BandLimiter bandLimiter;   // rango de frecuencias afectado (split)
+    juce::AudioBuffer<float> midBuf, dryBuf;
+    std::bitset<128> held, latched, pending;   // sostenidas / ultimo acorde / pendientes de soltar (pedal)
+    bool pedal = false;
+    float bypassMix = 1.f, gate = 1.f;
+    double sampleRate = 44100.0;
     int currentQuality = -1;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ArchaicProcessor)
 };

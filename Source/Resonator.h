@@ -4,14 +4,14 @@
 #include <algorithm>
 
 // Banco de resonadores afinados (inspirado en el concepto de Bismuth):
-// hasta 8 notas x 4 armonicos, filtros SVF (TPT) en doble precision.
+// hasta 8 notas x 8 armonicos (segun la forma de onda), filtros SVF (TPT) en doble precision.
 //   Spacing: estira/comprime la serie armonica (inarmonico)
 //   Drift:   desafinacion lenta + decorrelacion estereo
 //   Shift:   cambiador de frecuencia (Hz) sobre la salida resonada
 class ResonatorBank
 {
 public:
-    static constexpr int maxVoices = 8, partials = 4, subBlock = 16;
+    static constexpr int maxVoices = 8, partials = 8, subBlock = 16;
     static constexpr double pi = 3.14159265358979323846;
 
     struct Params
@@ -22,7 +22,21 @@ public:
         float spacing = 0.f;    // -1..1
         float drift = 0.f;      // 0..1
         float shiftHz = 0.f;
+        int wave = 3;           // 0 seno, 1 triangulo, 2 cuadrada, 3 sierra, 4 pulso
     };
+
+    // amplitud del armonico n (1..partials) segun la forma de onda
+    static float waveAmp (int wave, int n)
+    {
+        switch (wave)
+        {
+            case 0: return n == 1 ? 1.f : 0.f;
+            case 1: return (n % 2) ? 1.f / (float) (n * n) : 0.f;
+            case 2: return (n % 2) ? 1.f / (float) n : 0.f;
+            case 3: return 1.f / (float) n;
+            default: { const float a = std::abs (std::sin ((float) pi * (float) n * 0.25f)); return a < 1e-4f ? 0.f : a / (float) n; }
+        }
+    }
 
     void prepare (double sr) { sampleRate = sr; reset(); }
 
@@ -74,14 +88,17 @@ public:
                     const double detune = std::pow (2.0, cents / 1200.0);
                     for (int n_ = 0; n_ < partials; ++n_)
                     {
-                        double f = (double) curFreq[(size_t) v] * std::pow ((double) (n_ + 1), (double) expo) * detune;
-                        f = std::min (f, 0.45 * sr);
+                        const double fRaw = (double) curFreq[(size_t) v] * std::pow ((double) (n_ + 1), (double) expo) * detune;
+                        const double f = std::min (fRaw, 0.45 * sr);
                         const double g = std::tan (pi * f / sr);
                         auto& co = chan[(size_t) c].co[(size_t) (v * partials + n_)];
                         co.a1 = 1.0 / (1.0 + g * (g + (double) k));
                         co.a2 = g * co.a1;
                         co.a3 = g * co.a2;
-                        co.amp = (double) (voiceGain[(size_t) v] * std::pow ((float) (n_ + 1), -0.8f));
+                        const float wa = waveAmp (p.wave, n_ + 1);
+                        co.ampT = (fRaw >= 0.45 * sr || wa == 0.f) ? 0.0 : (double) (voiceGain[(size_t) v] * wa);
+                        co.amp += (co.ampT - co.amp) * 0.35;
+                        if (co.ampT == 0.0 && co.amp < 1e-6) co.amp = 0.0;
                     }
                 }
             }
@@ -99,8 +116,10 @@ public:
                     {
                         if (voiceGain[(size_t) (f / partials)] < 1e-5f && f / partials >= p.nVoices) continue;
                         const auto& co = ch.co[(size_t) f];
+                        if (co.amp == 0.0) continue;
                         double& ic1 = ch.ic1[(size_t) (f / partials)][(size_t) (f % partials)];
                         double& ic2 = ch.ic2[(size_t) (f / partials)][(size_t) (f % partials)];
+                        if (co.amp < 1e-7 && co.ampT < 1e-7) { ic1 = ic2 = 0.0; continue; }
                         const double v3 = in - ic2;
                         const double v1 = co.a1 * ic1 + co.a2 * v3;
                         const double v2 = ic2 + co.a2 * ic1 + co.a3 * v3;
@@ -141,7 +160,7 @@ private:
         return x < 0 ? -y : y;
     }
 
-    struct Coef { double a1 = 0, a2 = 0, a3 = 0, amp = 0; };
+    struct Coef { double a1 = 0, a2 = 0, a3 = 0, amp = 0, ampT = 0; };
 
     // Hilbert IIR de 2 ramas (Niemitalo)
     struct Hilbert

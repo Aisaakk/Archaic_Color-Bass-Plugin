@@ -18,6 +18,11 @@ namespace ID
     inline constexpr const char* drift = "drift";
     inline constexpr const char* shift = "shift";
     inline constexpr const char* resMix = "resmix";
+    inline constexpr const char* wave = "wave";
+    inline constexpr const char* liquid = "liquid";
+    inline constexpr const char* flow = "flow";
+    inline constexpr const char* splitLow = "splitlow";
+    inline constexpr const char* splitHigh = "splithigh";
 }
 
 struct ScaleDef { const char* name; std::vector<int> iv; };
@@ -77,6 +82,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
     l.add (pct (ID::drift, "Drift", 0.f, 100.f, 25.f, "%"));
     l.add (pct (ID::shift, "Shift", -500.f, 500.f, 0.f, "Hz"));
     l.add (pct (ID::resMix, "Res Mix", 0.f, 100.f, 35.f, "%"));
+    l.add (std::make_unique<AudioParameterChoice> (ParameterID { ID::wave, 1 }, "Wave",
+           StringArray { "Sine", "Triangle", "Square", "Saw", "Pulse" }, 3));
+    l.add (pct (ID::liquid, "Liquid", 0.f, 100.f, 0.f, "%"));
+    NormalisableRange<float> fr (20.f, 20000.f, 1.f);
+    fr.setSkewForCentre (1000.f);
+    l.add (std::make_unique<AudioParameterFloat> (ParameterID { ID::splitLow, 1 }, "Split Low", fr, 20.f, AudioParameterFloatAttributes().withLabel ("Hz")));
+    l.add (std::make_unique<AudioParameterFloat> (ParameterID { ID::splitHigh, 1 }, "Split High", fr, 20000.f, AudioParameterFloatAttributes().withLabel ("Hz")));
+    l.add (pct (ID::flow, "Flow", 0.f, 100.f, 40.f, "%"));
     return l;
 }
 

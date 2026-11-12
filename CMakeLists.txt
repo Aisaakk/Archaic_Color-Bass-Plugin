@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(Archaic VERSION 0.2.0)
+project(Archaic VERSION 0.3.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -36,9 +36,9 @@ target_sources(Archaic PRIVATE
 target_compile_definitions(Archaic PUBLIC
   JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
 
-# Assets incrustados (fuente del logotipo). Para usar tu propia fuente: reemplaza Assets/WordmarkFont.ttf
-# (GFS Didot, licencia SIL OFL). Mas assets (SVG/PNG): anadelos a SOURCES y usa BinaryData::nombre_ext
-juce_add_binary_data(ArchaicAssets SOURCES Assets/WordmarkFont.ttf)
+# Logotipos incrustados: Assets/LogoLight.png (modo claro) y Assets/LogoDark.png (modo oscuro).
+# Para cambiarlos, reemplaza esos PNG (con transparencia) manteniendo el nombre.
+juce_add_binary_data(ArchaicAssets SOURCES Assets/LogoLight.png Assets/LogoDark.png)
 set_target_properties(ArchaicAssets PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 
